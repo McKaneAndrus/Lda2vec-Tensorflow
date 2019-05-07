@@ -1,5 +1,6 @@
 from lda2vec import utils, b_model
 import numpy as np
+import os
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
@@ -26,6 +27,9 @@ num_topics = 20
 num_bias_topics = 5
 # How strongly we bias the topics
 bias_lambda = 1000.0
+# Factor that determines how much bias topics have to be close to all bias terms
+# 0 is uniform focus, 100+ is hard specialization
+bias_unity = 10.0
 # Epoch that we want to "switch on" LDA loss
 switch_loss_epoch = 5
 # Pretrained embeddings
@@ -43,6 +47,7 @@ m = b_model(num_docs,
           bias_idxes,
           bias_topics=num_bias_topics,
           bias_lmbda=bias_lambda,
+          bias_unity=bias_unity,
           embedding_size=embed_size,
           pretrained_embeddings=pretrained_embeddings,
           freqs=freqs,

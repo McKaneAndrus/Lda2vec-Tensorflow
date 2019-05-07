@@ -15,7 +15,7 @@ class bLda2vec:
 
     def __init__(self, num_unique_documents, vocab_size, num_topics, bias_idxes, bias_topics=5, freqs=None,
                  save_graph_def=True, embedding_size=128, num_sampled=40, learning_rate=0.001, lmbda=200.0,
-                 bias_lmbda = 10.0, alpha=None, power=0.75, batch_size=500, logdir='logdir',
+                 bias_lmbda = 1e-2, bias_unity=10.0, alpha=None, power=0.75, batch_size=500, logdir='logdir',
                  restore=False, fixed_words=False, factors_in=None, pretrained_embeddings=None):
         """Summary
 
@@ -65,6 +65,7 @@ class bLda2vec:
         self.bias_idxes = bias_idxes
         self.bias_topics = bias_topics
         self.bias_lmbda = bias_lmbda
+        self.bias_unity = bias_unity
 
         if not restore:
             self.date = datetime.now().strftime('%y%m%d_%H%M')
@@ -158,7 +159,6 @@ class bLda2vec:
         switch_loss = tf.Variable(0, trainable=False)
         # Word embedding lookup
         word_context = tf.nn.embedding_lookup(self.w_embed.embedding, x, name='word_embed_lookup')
-        bias_embedding = tf.nn.embedding_lookup(self.w_embed.embedding, b, name='bias_embed_lookup')
         # Document Context via document ID lookup
         doc_context = self.mixture(doc_ids=docs)
 
@@ -189,7 +189,10 @@ class bLda2vec:
             normed_topic_embeddings = self.normed_embed_dict['topic'][:self.bias_topics]
             normed_bias_embeddings = tf.stop_gradient(tf.nn.embedding_lookup(self.normed_embed_dict['word'], self.bias_idxes))
             topic_bias_cos_sim = tf.matmul(normed_topic_embeddings, tf.transpose(normed_bias_embeddings, [1, 0]))
-            bias_lda_loss = self.bias_lmbda * tf.reduce_mean(1 - tf.reduce_max(topic_bias_cos_sim, axis=1))
+            # topic_bias_weighted_sum = tf.reduce_sum((topic_bias_cos_sim ** 2), axis=1) / tf.reduce_sum(topic_bias_cos_sim, axis=1)
+            topic_bias_weighted_sum = tf.reduce_sum(tf.nn.softmax(topic_bias_cos_sim * self.bias_unity, axis=1)
+                                                        * topic_bias_cos_sim, axis=1)
+            bias_lda_loss = self.bias_lmbda * tf.reduce_mean(1 - topic_bias_weighted_sum)
             tf.summary.scalar('bias_lda_loss', bias_lda_loss)
             tf.summary.scalar('lda_loss', lda_loss)
             loss_lda = lda_loss + bias_lda_loss

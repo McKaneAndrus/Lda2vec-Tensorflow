@@ -11,12 +11,11 @@ data_path  = "data/clean_data"
 load_embeds = True
 
 # Load data from files
-(idx_to_word, word_to_idx, freqs, pivot_ids, target_ids, doc_ids, embed_matrix, bias_idxes) = utils.load_preprocessed_data(
-      data_path, load_embed_matrix=load_embeds, load_bias_idxes=True)
+(idx_to_word, word_to_idx, freqs, pivot_ids, target_ids, doc_ids, embed_matrix, seed_idxes) = utils.load_preprocessed_data(
+      data_path, load_embed_matrix=load_embeds, load_seed_idxes=True)
 
-bias_words = ['privacy', 'anonymity','confidentiality','disclosure']
-bias_idxes = [word_to_idx[word] for word in bias_words]
-
+seed_words = ["fish", "climate", "dollar", "help", "beer", "friend", "baby", "rent", "gun"]
+seed_idxes = [word_to_idx[word] for word in seed_words]
 
 # Number of unique documents
 num_docs = len(np.unique(doc_ids))
@@ -27,13 +26,8 @@ vocab_size = embed_matrix.shape[0]
 embed_size = embed_matrix.shape[1] if load_embeds else 128
 # Number of topics to cluster into
 num_topics = 20
-# Number of topics to bias
-num_bias_topics = 5
-# How strongly we bias the topics
-bias_lambda = 1e-2
-# Factor that determines how much bias topics have to be close to all bias terms
-# 0 is uniform focus, 100+ is hard specialization
-bias_unity = 10.0
+# How strongly we seed the topics
+seed_lambda = 1e-2
 # Epoch that we want to "switch on" LDA loss
 switch_loss_epoch = 5
 # Pretrained embeddings
@@ -42,16 +36,14 @@ pretrained_embeddings = embed_matrix if load_embeds else None
 save_graph = True
 num_epochs = 200
 batch_size = 512 #4096
-logdir = "bias_experiment"
+logdir = "seed_experiment"
 
 # Initialize the model
 m = b_model(num_docs,
           vocab_size,
           num_topics,
-          bias_idxes,
-          bias_topics=num_bias_topics,
-          bias_lmbda=bias_lambda,
-          bias_unity=bias_unity,
+          seed_idxes,
+          seed_lmbda=seed_lambda,
           embedding_size=embed_size,
           pretrained_embeddings=pretrained_embeddings,
           freqs=freqs,

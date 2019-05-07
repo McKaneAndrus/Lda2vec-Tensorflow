@@ -102,7 +102,7 @@ class bLda2vec:
 
             (self.x, self.y, self.docs, self.step, self.switch_loss,
              self.word_context, self.doc_context, self.loss_word2vec,
-             self.fraction, self.loss_lda, self.loss, self.loss_avgs_op,
+             self.fraction, self.loss_lda, self.bias_loss_lda, self.loss, self.loss_avgs_op,
              self.optimizer, self.merged) = handles
 
         else:
@@ -112,7 +112,7 @@ class bLda2vec:
 
             (self.x, self.y, self.docs, self.step, self.switch_loss,
              self.word_context, self.doc_context, self.loss_word2vec,
-             self.fraction, self.loss_lda, self.loss, self.loss_avgs_op,
+             self.fraction, self.loss_lda, self.bias_loss_lda, self.loss, self.loss_avgs_op,
              self.optimizer, self.merged, embedding, nce_weights, nce_biases,
              doc_embedding, topic_embedding) = handles
 
@@ -189,7 +189,7 @@ class bLda2vec:
             normed_topic_embeddings = self.normed_embed_dict['topic'][:self.bias_topics]
             normed_bias_embeddings = tf.stop_gradient(tf.nn.embedding_lookup(self.normed_embed_dict['word'], self.bias_idxes))
             topic_bias_cos_sim = tf.matmul(normed_topic_embeddings, tf.transpose(normed_bias_embeddings, [1, 0]))
-            bias_lda_loss = self.bias_lmbda * tf.reduce_average(1 - tf.reduce_max(topic_bias_cos_sim, axis=1))
+            bias_lda_loss = self.bias_lmbda * tf.reduce_mean(1 - tf.reduce_max(topic_bias_cos_sim, axis=1))
             tf.summary.scalar('bias_lda_loss', bias_lda_loss)
             tf.summary.scalar('lda_loss', lda_loss)
             loss_lda = lda_loss + bias_lda_loss
@@ -215,7 +215,7 @@ class bLda2vec:
         merged = tf.summary.merge_all()
 
         to_return = [x, y, docs, step, switch_loss, word_context, doc_context,
-                     loss_word2vec, fraction, loss_lda, loss, loss_avgs_op, optimizer, merged]
+                     loss_word2vec, fraction, loss_lda, bias_lda_loss, loss, loss_avgs_op, optimizer, merged]
 
         return to_return
 
@@ -265,14 +265,14 @@ class bLda2vec:
 
                 # Values we want to fetch whenever we run the model
                 fetches = [self.merged, self.optimizer, self.loss,
-                           self.loss_word2vec, self.loss_lda, self.step]
+                           self.loss_word2vec, self.loss_lda, self.bias_loss_lda, self.step]
 
                 # Run a step of the model
-                summary, _, l, lw2v, llda, step = self.sesh.run(fetches, feed_dict=feed_dict)
+                summary, _, l, lw2v, llda, blda, step = self.sesh.run(fetches, feed_dict=feed_dict)
 
             # Prints log every "report_every" epoch
             if (e + 1) % report_every == 0:
-                print('LOSS', l, 'w2v', lw2v, 'lda', llda)
+                print('LOSS', l, 'w2v', lw2v, 'lda', llda, 'blda', blda)
 
             # Saves model every "save_every" epoch
             if (e + 1) % save_every == 0 and self.save_graph_def:

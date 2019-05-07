@@ -1,6 +1,9 @@
 from lda2vec import utils, b_model
 import numpy as np
 
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+
 # Path to preprocessed data
 data_path  = "data/clean_data"
 # Whether or not to load saved embeddings file
@@ -21,6 +24,8 @@ embed_size = embed_matrix.shape[1] if load_embeds else 128
 num_topics = 20
 # Number of topics to bias
 num_bias_topics = 5
+# How strongly we bias the topics
+bias_lambda = 1000.0
 # Epoch that we want to "switch on" LDA loss
 switch_loss_epoch = 5
 # Pretrained embeddings
@@ -29,6 +34,7 @@ pretrained_embeddings = embed_matrix if load_embeds else None
 save_graph = True
 num_epochs = 200
 batch_size = 512 #4096
+logdir = "bias_experiment"
 
 # Initialize the model
 m = b_model(num_docs,
@@ -36,11 +42,13 @@ m = b_model(num_docs,
           num_topics,
           bias_idxes,
           bias_topics=num_bias_topics,
+          bias_lmbda=bias_lambda,
           embedding_size=embed_size,
           pretrained_embeddings=pretrained_embeddings,
           freqs=freqs,
           batch_size = batch_size,
-          save_graph_def=save_graph)
+          save_graph_def=save_graph,
+          logdir=logdir)
 
 # Train the model
 m.train(pivot_ids,

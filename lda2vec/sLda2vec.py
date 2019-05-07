@@ -10,12 +10,12 @@ import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
-class bLda2vec:
+class sLda2vec:
     RESTORE_KEY = 'to_restore'
 
-    def __init__(self, num_unique_documents, vocab_size, num_topics, bias_idxes, bias_topics=5, freqs=None,
+    def __init__(self, num_unique_documents, vocab_size, num_topics, seed_idxes, freqs=None,
                  save_graph_def=True, embedding_size=128, num_sampled=40, learning_rate=0.001, lmbda=200.0,
-                 bias_lmbda = 1e-2, bias_unity=10.0, alpha=None, power=0.75, batch_size=500, logdir='logdir',
+                 seed_lmbda = 1e-2, alpha=None, power=0.75, batch_size=500, logdir='logdir',
                  restore=False, fixed_words=False, factors_in=None, pretrained_embeddings=None):
         """Summary
 
@@ -39,8 +39,6 @@ class bLda2vec:
             pretrained_embeddings (None, optional): Description
 
         """
-        assert(num_topics >= bias_topics)
-
         self.config = tf.ConfigProto()
         self.config.gpu_options.allow_growth = True
         self.sesh = tf.Session(config=self.config)
@@ -62,10 +60,8 @@ class bLda2vec:
         self.factors_in = factors_in
         # self.compute_normed = False
         self.fixed_words = fixed_words
-        self.bias_idxes = bias_idxes
-        self.bias_topics = bias_topics
-        self.bias_lmbda = bias_lmbda
-        self.bias_unity = bias_unity
+        self.seed_idxes = seed_idxes
+        self.seed_lmbda = seed_lmbda
 
         if not restore:
             self.date = datetime.now().strftime('%y%m%d_%H%M')
@@ -90,30 +86,30 @@ class bLda2vec:
             handles = self._build_graph()
 
             for handle in handles:
-                tf.add_to_collection(bLda2vec.RESTORE_KEY, handle)
+                tf.add_to_collection(sLda2vec.RESTORE_KEY, handle)
 
             # Add Word Embedding Variables to collection
-            tf.add_to_collection(bLda2vec.RESTORE_KEY, self.w_embed.embedding)
-            tf.add_to_collection(bLda2vec.RESTORE_KEY, self.w_embed.nce_weights)
-            tf.add_to_collection(bLda2vec.RESTORE_KEY, self.w_embed.nce_biases)
+            tf.add_to_collection(sLda2vec.RESTORE_KEY, self.w_embed.embedding)
+            tf.add_to_collection(sLda2vec.RESTORE_KEY, self.w_embed.nce_weights)
+            tf.add_to_collection(sLda2vec.RESTORE_KEY, self.w_embed.nce_biases)
 
             # Add Doc Mixture Variables to collection
-            tf.add_to_collection(bLda2vec.RESTORE_KEY, self.mixture.doc_embedding)
-            tf.add_to_collection(bLda2vec.RESTORE_KEY, self.mixture.topic_embedding)
+            tf.add_to_collection(sLda2vec.RESTORE_KEY, self.mixture.doc_embedding)
+            tf.add_to_collection(sLda2vec.RESTORE_KEY, self.mixture.topic_embedding)
 
             (self.x, self.y, self.docs, self.step, self.switch_loss,
              self.word_context, self.doc_context, self.loss_word2vec,
-             self.fraction, self.loss_lda, self.bias_loss_lda, self.loss, self.loss_avgs_op,
+             self.fraction, self.loss_lda, self.seed_loss_lda, self.loss, self.loss_avgs_op,
              self.optimizer, self.merged) = handles
 
         else:
             meta_graph = logdir + '/model.ckpt'
             tf.train.import_meta_graph(meta_graph + '.meta').restore(self.sesh, meta_graph)
-            handles = self.sesh.graph.get_collection(bLda2vec.RESTORE_KEY)
+            handles = self.sesh.graph.get_collection(sLda2vec.RESTORE_KEY)
 
             (self.x, self.y, self.docs, self.step, self.switch_loss,
              self.word_context, self.doc_context, self.loss_word2vec,
-             self.fraction, self.loss_lda, self.bias_loss_lda, self.loss, self.loss_avgs_op,
+             self.fraction, self.loss_lda, self.seed_loss_lda, self.loss, self.loss_avgs_op,
              self.optimizer, self.merged, embedding, nce_weights, nce_biases,
              doc_embedding, topic_embedding) = handles
 
@@ -141,7 +137,7 @@ class bLda2vec:
         return doc_prior
 
     def _build_graph(self):
-        """Builds the bLda2vec model graph.
+        """Builds the sLda2vec model graph.
         """
         # Model Inputs
         # Pivot Words
@@ -151,7 +147,7 @@ class bLda2vec:
         # Document ID
         docs = tf.placeholder(tf.int32, shape=[None], name='doc_ids')
         # Bias terms
-        b = tf.placeholder(tf.int32, shape=[None], name='bias_idxs')
+        b = tf.placeholder(tf.int32, shape=[None], name='seed_idxs')
 
         # Global Step
         step = tf.Variable(0, trainable=False, name='global_step')
@@ -166,7 +162,7 @@ class bLda2vec:
         contexts_to_add = [word_context, doc_context]
         context = tf.add_n(contexts_to_add, name='context_vector')
 
-        # Need normed vectors for biasing
+        # Need normed vectors for seeding
         self.normed_embed_dict = {}
         norm = tf.sqrt(tf.reduce_sum(self.mixture.topic_embedding ** 2, 1, keep_dims=True))
         self.normed_embed_dict['topic'] = self.mixture.topic_embedding / norm
@@ -186,16 +182,13 @@ class bLda2vec:
         with tf.name_scope('lda_loss'):
             fraction = tf.Variable(1, trainable=False, dtype=tf.float32, name='fraction')
             lda_loss = self.lmbda * fraction * self.prior()
-            normed_topic_embeddings = self.normed_embed_dict['topic'][:self.bias_topics]
-            normed_bias_embeddings = tf.stop_gradient(tf.nn.embedding_lookup(self.normed_embed_dict['word'], self.bias_idxes))
-            topic_bias_cos_sim = tf.matmul(normed_topic_embeddings, tf.transpose(normed_bias_embeddings, [1, 0]))
-            # topic_bias_weighted_sum = tf.reduce_sum((topic_bias_cos_sim ** 2), axis=1) / tf.reduce_sum(topic_bias_cos_sim, axis=1)
-            topic_bias_weighted_sum = tf.reduce_sum(tf.nn.softmax(topic_bias_cos_sim * self.bias_unity, axis=1)
-                                                        * topic_bias_cos_sim, axis=1)
-            bias_lda_loss = self.bias_lmbda * tf.reduce_mean(1 - topic_bias_weighted_sum)
-            tf.summary.scalar('bias_lda_loss', bias_lda_loss)
+            normed_topic_embeddings = self.normed_embed_dict['topic'][:len(self.seed_idxes)]
+            normed_seed_embeddings = tf.stop_gradient(tf.nn.embedding_lookup(self.normed_embed_dict['word'], self.seed_idxes))
+            topic_seed_cos_sim = tf.reduce_sum(normed_topic_embeddings * normed_seed_embeddings, axis=1)
+            seed_lda_loss = self.seed_lmbda * tf.reduce_mean(1 - topic_seed_cos_sim)
+            tf.summary.scalar('seed_lda_loss', seed_lda_loss)
             tf.summary.scalar('lda_loss', lda_loss)
-            loss_lda = lda_loss + bias_lda_loss
+            loss_lda = lda_loss + seed_lda_loss
 
 
         # Determine if we should be using only word2vec loss or if we should add in LDA loss based on switch_loss Variable
@@ -218,13 +211,13 @@ class bLda2vec:
         merged = tf.summary.merge_all()
 
         to_return = [x, y, docs, step, switch_loss, word_context, doc_context,
-                     loss_word2vec, fraction, loss_lda, bias_lda_loss, loss, loss_avgs_op, optimizer, merged]
+                     loss_word2vec, fraction, loss_lda, seed_lda_loss, loss, loss_avgs_op, optimizer, merged]
 
         return to_return
 
     def train(self, pivot_words, target_words, doc_ids, data_size, num_epochs, switch_loss_epoch=0,
               save_every=1, report_every=1, print_topics_every=1, idx_to_word=None):
-        """Train the bLda2vec Model. pivot_words, target_words, and doc_ids should be
+        """Train the sLda2vec Model. pivot_words, target_words, and doc_ids should be
         the same size.
 
         Args:
@@ -268,14 +261,14 @@ class bLda2vec:
 
                 # Values we want to fetch whenever we run the model
                 fetches = [self.merged, self.optimizer, self.loss,
-                           self.loss_word2vec, self.loss_lda, self.bias_loss_lda, self.step]
+                           self.loss_word2vec, self.loss_lda, self.seed_loss_lda, self.step]
 
                 # Run a step of the model
-                summary, _, l, lw2v, llda, blda, step = self.sesh.run(fetches, feed_dict=feed_dict)
+                summary, _, l, lw2v, llda, slda, step = self.sesh.run(fetches, feed_dict=feed_dict)
 
             # Prints log every "report_every" epoch
             if (e + 1) % report_every == 0:
-                print('LOSS', l, 'w2v', lw2v, 'lda', llda, 'blda', blda)
+                print('LOSS', l, 'w2v', lw2v, 'lda', llda, 'slda', slda)
 
             # Saves model every "save_every" epoch
             if (e + 1) % save_every == 0 and self.save_graph_def:

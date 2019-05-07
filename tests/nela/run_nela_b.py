@@ -26,7 +26,7 @@ num_topics = 20
 # Number of topics to bias
 num_bias_topics = 5
 # How strongly we bias the topics
-bias_lambda = 1000.0
+bias_lambda = 1e-2
 # Factor that determines how much bias topics have to be close to all bias terms
 # 0 is uniform focus, 100+ is hard specialization
 bias_unity = 10.0

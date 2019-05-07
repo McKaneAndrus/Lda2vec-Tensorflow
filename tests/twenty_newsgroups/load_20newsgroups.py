@@ -23,7 +23,7 @@ P.preprocess()
 # Load embeddings from file if we choose to do so
 if load_embeds:
     # Load embedding matrix from file path - change path to where you saved them
-    embedding_matrix = P.load_glove("/media/dlmachine/SSD_2/embeddings/glove.6B.300d.txt")
+    embedding_matrix = P.load_glove("../glove.6B.300d.txt")
 else:
     embedding_matrix = None
 

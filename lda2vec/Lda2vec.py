@@ -271,7 +271,7 @@ class Lda2vec:
 
     def compute_normed_embeds(self):
         """Normalizes embeddings so we can measure cosine similarity
-        between different embedding matrixes.
+        between different embedding matrices.
         """
         self.normed_embed_dict = {}
         norm = tf.sqrt(tf.reduce_sum(self.mixture.topic_embedding ** 2, 1, keep_dims=True))

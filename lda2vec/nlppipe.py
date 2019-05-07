@@ -36,6 +36,7 @@ class Preprocessor:
         self.max_features = max_features
         self.window_size = window_size
         self.min_count = min_count
+        self.bias_idxes = None
 
         # Here we disable parts of spacy's pipeline - REALLY improves speed.
         self.nlp = spacy.load(nlp, disable = ['ner', 'parser'])
@@ -66,8 +67,8 @@ class Preprocessor:
             doc_texts = []
             for token in doc:
                 # Some options for you - TODO pass attrs dictionary
-                #if not token.like_email and not token.like_url and not token.is_punct and not token.like_num and token.is_alpha:
-                if token.is_alpha and not token.is_stop:
+                if not token.like_email and not token.like_url and not token.is_punct and not token.like_num and token.is_alpha and not token.is_stop:
+                # if token.is_alpha and not token.is_stop:
                     if self.token_type == "lemma":
                         if token.lemma_ == "-PRON-":
                             doc_texts.append(token.lower_)
@@ -90,6 +91,8 @@ class Preprocessor:
         if self.min_count != None:
             # Get all the words to remove
             words_to_rm = [w for w,c in self.tokenizer.word_counts.items() if c < self.min_count and w != "<UNK>"]
+            # Remove words that only appear in one document as they are unlikely to generate "topics"
+            # words_to_rm += [w for w,c in self.tokenizer.word_docs.items() if c < 2 and w != "<UNK>" and w not in words_to_rm]
             print("Removing {0} low frequency tokens out of {1} total tokens".format(len(words_to_rm), len(self.tokenizer.word_counts)))
             # Iterate over those words and remove them from the necessary Tokenizer attributes
             for w in words_to_rm:
@@ -124,7 +127,7 @@ class Preprocessor:
     
     def load_glove(self, EMBEDDING_FILE):
         def get_coefs(word,*arr): return word, np.asarray(arr, dtype='float32')
-        embeddings_index = dict(get_coefs(*o.split(" ")) for o in open(EMBEDDING_FILE))
+        embeddings_index = dict(get_coefs(*o.split(" ")) for o in open(EMBEDDING_FILE, encoding="utf-8"))
 
         all_embs = np.stack(embeddings_index.values())
         emb_mean,emb_std = all_embs.mean(), all_embs.std()
@@ -173,6 +176,10 @@ class Preprocessor:
             if embedding_vector is not None: embedding_matrix[i] = embedding_vector
         
         return embedding_matrix
+
+    def get_bias_term_indexes(self, words):
+
+        self.bias_idxes = [self.tokenizer.word_index[word] for word in words]
 
     def get_skipgrams(self):
         """Gets all the skipgram pairs needed for doing Lda2Vec.
@@ -255,7 +262,11 @@ class Preprocessor:
         idx_to_word_out.close()
         word_to_idx_out = open(path + "/word_to_idx.pickle", "wb")
         pickle.dump(self.word_to_idx, word_to_idx_out)
-        word_to_idx_out.close()        
+        word_to_idx_out.close()
+        if self.bias_idxes is not None:
+            bias_idxes_out = open(path + "/bias_idxes.pickle", "wb")
+            pickle.dump(self.bias_idxes, bias_idxes_out)
+            bias_idxes_out.close()
 
         np.save(path+"/doc_lengths", self.doc_lengths)
         np.save(path+"/freqs", self.freqs)

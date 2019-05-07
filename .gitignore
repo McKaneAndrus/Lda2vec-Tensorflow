@@ -10,3 +10,7 @@ lda2vec/Lda2vec_supervised.py
 lda2vec/Lda2vec_supervised_v2.py
 lda2vec/seq_utils.py
 tests/supervised_twenty_newsgroups/
+
+*.DS_Store
+*.idea
+

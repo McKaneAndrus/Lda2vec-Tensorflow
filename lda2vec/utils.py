@@ -87,7 +87,7 @@ def prepare_topics(weights, factors, word_vectors, vocab, temperature=1.0,
     return data
 
 
-def load_preprocessed_data(data_path, load_embed_matrix=False, shuffle_data=True):
+def load_preprocessed_data(data_path, load_embed_matrix=False, load_bias_idxes=False, shuffle_data=True):
     """Load in all data that was processed via the preprocessing files included
     in this library. Optionally load embedding matrix, if you preprocessed and saved one
     in the data_path. 
@@ -113,6 +113,10 @@ def load_preprocessed_data(data_path, load_embed_matrix=False, shuffle_data=True
     with open(data_path + "/" + "word_to_idx.pickle", "rb") as w2i_in:
         word_to_idx = pickle.load(w2i_in)
 
+    if load_bias_idxes:
+        with open(data_path + "/" + "bias_idxes.pickle", "rb") as bi_in:
+            bias_idxes = pickle.load(bi_in)
+
     freqs = np.load(data_path + "/" + "freqs.npy")
     freqs = freqs.tolist()
 
@@ -130,11 +134,16 @@ def load_preprocessed_data(data_path, load_embed_matrix=False, shuffle_data=True
         # Shuffle the data
         pivot_ids, target_ids, doc_ids = shuffle(pivot_ids, target_ids, doc_ids, random_state=0)
 
-
-    if load_embed_matrix:
-        return (idx_to_word, word_to_idx, freqs, pivot_ids, target_ids, doc_ids, embed_matrix)
+    if load_bias_idxes:
+        if load_embed_matrix:
+            return (idx_to_word, word_to_idx, freqs, pivot_ids, target_ids, doc_ids, embed_matrix, bias_idxes)
+        else:
+            return (idx_to_word, word_to_idx, freqs, pivot_ids, target_ids, doc_ids, bias_idxes)
     else:
-        return (idx_to_word, word_to_idx, freqs, pivot_ids, target_ids, doc_ids)
+        if load_embed_matrix:
+            return (idx_to_word, word_to_idx, freqs, pivot_ids, target_ids, doc_ids, embed_matrix)
+        else:
+            return (idx_to_word, word_to_idx, freqs, pivot_ids, target_ids, doc_ids)
 
 
 def generate_ldavis_data(data_path, model, idx_to_word, freqs, vocab_size):

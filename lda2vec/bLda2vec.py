@@ -136,7 +136,8 @@ class bLda2vec:
         Returns:
             TYPE: Dirichlet Prior Value
         """
-        doc_prior = DL.dirichlet_likelihood(self.mixture.doc_embedding, alpha=self.alpha)
+        # doc_prior = DL.dirichlet_likelihood(self.mixture.doc_embedding, alpha=self.alpha)
+        doc_prior = DL.pseudo_dirichlet(self.mixture.doc_embedding, alpha=self.alpha)
 
         return doc_prior
 

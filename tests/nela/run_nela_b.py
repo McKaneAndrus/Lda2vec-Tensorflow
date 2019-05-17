@@ -15,7 +15,12 @@ load_embeds = True
       data_path, load_embed_matrix=load_embeds, load_bias_idxes=True)
 
 bias_words = ['privacy', 'anonymity','confidentiality','disclosure']
-bias_idxes = [word_to_idx[word] for word in bias_words]
+base_bias_idxes = [word_to_idx[word] for word in bias_words]
+bias_idxes = [[base_bias_idxes[0], base_bias_idxes[1]],
+              [base_bias_idxes[0], base_bias_idxes[2]],
+              [base_bias_idxes[0], base_bias_idxes[3]],
+              [base_bias_idxes[0]]
+              [base_bias_idxes[2]]
 
 
 # Number of unique documents
@@ -33,7 +38,9 @@ num_bias_topics = 5
 bias_lambda = 1e-2
 # Factor that determines how much bias topics have to be close to all bias terms
 # 0 is uniform focus, 100+ is hard specialization
-bias_unity = 10.0
+bias_unity = 20.0
+
+target_bias_topic_cov=0.8
 # Epoch that we want to "switch on" LDA loss
 switch_loss_epoch = 5
 # Pretrained embeddings
@@ -42,6 +49,7 @@ pretrained_embeddings = embed_matrix if load_embeds else None
 save_graph = True
 num_epochs = 200
 batch_size = 512 #4096
+lmbda = 1e-4
 logdir = "bias_experiment"
 
 # Initialize the model
@@ -52,6 +60,7 @@ m = b_model(num_docs,
           bias_topics=num_bias_topics,
           bias_lmbda=bias_lambda,
           bias_unity=bias_unity,
+          target_bias_topic_cov=0.8,
           embedding_size=embed_size,
           pretrained_embeddings=pretrained_embeddings,
           freqs=freqs,

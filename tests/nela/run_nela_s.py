@@ -1,4 +1,4 @@
-from lda2vec import utils, b_model
+from lda2vec import utils, s_model
 import numpy as np
 import os
 
@@ -11,11 +11,18 @@ data_path  = "data/clean_data"
 load_embeds = True
 
 # Load data from files
-(idx_to_word, word_to_idx, freqs, pivot_ids, target_ids, doc_ids, embed_matrix, seed_idxes) = utils.load_preprocessed_data(
-      data_path, load_embed_matrix=load_embeds, load_seed_idxes=True)
+(idx_to_word, word_to_idx, freqs, pivot_ids, target_ids, doc_ids, embed_matrix) = utils.load_preprocessed_data(
+      data_path, load_embed_matrix=load_embeds)
 
-seed_words = ["fish", "climate", "dollar", "help", "beer", "friend", "baby", "rent", "gun"]
-seed_idxes = [word_to_idx[word] for word in seed_words]
+seed_words = ['privacy', 'anonymity','confidentiality','disclosure']
+seed_idxes = [word_to_idx[word] for word in seed_words if word in word_to_idx]
+
+base_seed_idxes = [word_to_idx[word] for word in seed_words]
+seed_idxes = [[base_seed_idxes[0], base_seed_idxes[1]],
+              [base_seed_idxes[0], base_seed_idxes[2]],
+              [base_seed_idxes[0], base_seed_idxes[3]],
+              [base_seed_idxes[0]]
+              [base_seed_idxes[2]]
 
 # Number of unique documents
 num_docs = len(np.unique(doc_ids))
@@ -36,13 +43,15 @@ pretrained_embeddings = embed_matrix if load_embeds else None
 save_graph = True
 num_epochs = 200
 batch_size = 512 #4096
+lmbda = -1e-4
 logdir = "seed_experiment"
 
 # Initialize the model
-m = b_model(num_docs,
+m = s_model(num_docs,
           vocab_size,
           num_topics,
           seed_idxes,
+          lmbda=lmbda,
           seed_lmbda=seed_lambda,
           embedding_size=embed_size,
           pretrained_embeddings=pretrained_embeddings,

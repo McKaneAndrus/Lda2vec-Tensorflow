@@ -6,6 +6,9 @@ from keras.preprocessing.sequence import skipgrams
 import pickle
 from tqdm import tqdm
 import os
+# import nltk
+
+
 
 class Preprocessor:
     def __init__(self, df, textcol, max_features=30000, maxlen=None, window_size=5, nlp="en_core_web_sm",
@@ -42,6 +45,7 @@ class Preprocessor:
         self.nlp = spacy.load(nlp, disable = ['ner', 'parser'])
         self.nlp.vocab.add_flag(lambda s: s.lower() in spacy.lang.en.stop_words.STOP_WORDS,
                                                        spacy.attrs.IS_STOP)
+        # self.english_vocab = set(w.lower() for w in nltk.corpus.words.words())
 
     def clean(self, line):
         return ' '.join(w for w in line.split() if not any(t in w for t in self.bad))
@@ -67,7 +71,7 @@ class Preprocessor:
             doc_texts = []
             for token in doc:
                 # Some options for you - TODO pass attrs dictionary
-                if not token.like_email and not token.like_url and not token.is_punct and not token.like_num and token.is_alpha and not token.is_stop:
+                if not token.like_email and not token.like_url and not token.is_punct and not token.like_num and token.is_alpha and not token.is_stop and len(token.lower_) > 3:
                 # if token.is_alpha and not token.is_stop:
                     if self.token_type == "lemma":
                         if token.lemma_ == "-PRON-":

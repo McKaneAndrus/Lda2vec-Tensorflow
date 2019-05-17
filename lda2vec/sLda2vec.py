@@ -183,7 +183,13 @@ class sLda2vec:
             fraction = tf.Variable(1, trainable=False, dtype=tf.float32, name='fraction')
             lda_loss = self.lmbda * fraction * self.prior()
             normed_topic_embeddings = self.normed_embed_dict['topic'][:len(self.seed_idxes)]
-            normed_seed_embeddings = tf.stop_gradient(tf.nn.embedding_lookup(self.normed_embed_dict['word'], self.seed_idxes))
+            if type(self.seed_idxes[0]) is int:
+                normed_seed_embeddings = tf.stop_gradient(
+                    tf.nn.embedding_lookup(self.normed_embed_dict['word'], self.seed_idxes))
+            else:
+                seed_topic_embeddings = [tf.reduce_mean(tf.nn.embedding_lookup(
+                    self.normed_embed_dict['word'], seed_topic), axis=1) for seed_topic in self.seed_idxes]
+                normed_seed_embeddings = tf.stop_gradient(tf.stack(seed_topic_embeddings))
             topic_seed_cos_sim = tf.reduce_sum(normed_topic_embeddings * normed_seed_embeddings, axis=1)
             seed_lda_loss = self.seed_lmbda * tf.reduce_mean(1 - topic_seed_cos_sim)
             tf.summary.scalar('seed_lda_loss', seed_lda_loss)

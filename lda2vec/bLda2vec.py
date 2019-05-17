@@ -15,7 +15,7 @@ class bLda2vec:
 
     def __init__(self, num_unique_documents, vocab_size, num_topics, bias_idxes, bias_topics=5, freqs=None,
                  save_graph_def=True, embedding_size=128, num_sampled=40, learning_rate=0.001, lmbda=200.0,
-                 bias_lmbda = 1e-2, bias_unity=10.0, alpha=None, power=0.75, batch_size=500, logdir='logdir',
+                 bias_lmbda = 1e-2, bias_unity=10.0, target_bias_topic_cov=1.0, alpha=None, power=0.75, batch_size=500, logdir='logdir',
                  restore=False, fixed_words=False, factors_in=None, pretrained_embeddings=None):
         """Summary
 
@@ -66,6 +66,7 @@ class bLda2vec:
         self.bias_topics = bias_topics
         self.bias_lmbda = bias_lmbda
         self.bias_unity = bias_unity
+        self.target_bias_topic_cov = target_bias_topic_cov
 
         if not restore:
             self.date = datetime.now().strftime('%y%m%d_%H%M')
@@ -136,8 +137,8 @@ class bLda2vec:
         Returns:
             TYPE: Dirichlet Prior Value
         """
-        # doc_prior = DL.dirichlet_likelihood(self.mixture.doc_embedding, alpha=self.alpha)
-        doc_prior = DL.pseudo_dirichlet(self.mixture.doc_embedding, alpha=self.alpha)
+        doc_prior = DL.dirichlet_likelihood(self.mixture.doc_embedding, alpha=self.alpha)
+        # doc_prior = DL.pseudo_dirichlet(self.mixture.doc_embedding, alpha=self.alpha)
 
         return doc_prior
 
@@ -188,15 +189,20 @@ class bLda2vec:
             fraction = tf.Variable(1, trainable=False, dtype=tf.float32, name='fraction')
             lda_loss = self.lmbda * fraction * self.prior()
             normed_topic_embeddings = self.normed_embed_dict['topic'][:self.bias_topics]
-            normed_bias_embeddings = tf.stop_gradient(tf.nn.embedding_lookup(self.normed_embed_dict['word'], self.bias_idxes))
+            normed_bias_embeddings = tf.stop_gradient(
+                tf.nn.embedding_lookup(self.normed_embed_dict['word'], self.bias_idxes))
             topic_bias_cos_sim = tf.matmul(normed_topic_embeddings, tf.transpose(normed_bias_embeddings, [1, 0]))
             # topic_bias_weighted_sum = tf.reduce_sum((topic_bias_cos_sim ** 2), axis=1) / tf.reduce_sum(topic_bias_cos_sim, axis=1)
             topic_bias_weighted_sum = tf.reduce_sum(tf.nn.softmax(topic_bias_cos_sim * self.bias_unity, axis=1)
                                                         * topic_bias_cos_sim, axis=1)
             bias_lda_loss = self.bias_lmbda * tf.reduce_mean(1 - topic_bias_weighted_sum)
+            bias_topic_self_similarity = tf.reduce_mean(tf.matmul(normed_topic_embeddings,
+                                            tf.transpose(normed_topic_embeddings, [1, 0])) - np.eye(self.bias_topics))
             tf.summary.scalar('bias_lda_loss', bias_lda_loss)
             tf.summary.scalar('lda_loss', lda_loss)
-            loss_lda = lda_loss + bias_lda_loss
+            tf.summary.scalar('bias_topic_cov', bias_topic_self_similarity)
+
+            loss_lda = lda_loss + bias_lda_loss + tf.max(0, bias_topic_self_similarity - self.target_bias_topic_cov)
 
 
         # Determine if we should be using only word2vec loss or if we should add in LDA loss based on switch_loss Variable

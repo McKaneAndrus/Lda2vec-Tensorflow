@@ -15,13 +15,7 @@ load_embeds = True
       data_path, load_embed_matrix=load_embeds, load_bias_idxes=True)
 
 bias_words = ['privacy', 'anonymity','confidentiality','disclosure']
-base_bias_idxes = [word_to_idx[word] for word in bias_words]
-bias_idxes = [[base_bias_idxes[0], base_bias_idxes[1]],
-              [base_bias_idxes[0], base_bias_idxes[2]],
-              [base_bias_idxes[0], base_bias_idxes[3]],
-              [base_bias_idxes[0]]
-              [base_bias_idxes[2]]
-
+bias_idxes = [word_to_idx[word] for word in bias_words]
 
 # Number of unique documents
 num_docs = len(np.unique(doc_ids))

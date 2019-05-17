@@ -69,7 +69,7 @@ class sLda2vec:
 
             # Load pretrained embeddings if provided.
             if isinstance(pretrained_embeddings, np.ndarray):
-                W_in = tf.constant(pretrained_embeddings, name="word_embedding") if fixed_words else tf.get_variable(
+                W_in = tf.constant(pretrained_embeddings, name="word_embedding", dtype=tf.float32) if fixed_words else tf.get_variable(
                     "word_embedding", shape=[self.vocab_size, self.embedding_size],
                     initializer=tf.constant_initializer(pretrained_embeddings))
             else:
@@ -188,7 +188,7 @@ class sLda2vec:
                     tf.nn.embedding_lookup(self.normed_embed_dict['word'], self.seed_idxes))
             else:
                 seed_topic_embeddings = [tf.reduce_mean(tf.nn.embedding_lookup(
-                    self.normed_embed_dict['word'], seed_topic), axis=1) for seed_topic in self.seed_idxes]
+                    self.normed_embed_dict['word'], seed_topic), axis=0) for seed_topic in self.seed_idxes]
                 normed_seed_embeddings = tf.stop_gradient(tf.stack(seed_topic_embeddings))
             topic_seed_cos_sim = tf.reduce_sum(normed_topic_embeddings * normed_seed_embeddings, axis=1)
             seed_lda_loss = self.seed_lmbda * tf.reduce_mean(1 - topic_seed_cos_sim)

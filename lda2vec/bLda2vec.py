@@ -74,7 +74,7 @@ class bLda2vec:
 
             # Load pretrained embeddings if provided.
             if isinstance(pretrained_embeddings, np.ndarray):
-                W_in = tf.constant(pretrained_embeddings, name="word_embedding") if fixed_words else tf.get_variable(
+                W_in = tf.constant(pretrained_embeddings, name="word_embedding", dtype=tf.float32) if fixed_words else tf.get_variable(
                     "word_embedding", shape=[self.vocab_size, self.embedding_size],
                     initializer=tf.constant_initializer(pretrained_embeddings))
             else:
@@ -202,7 +202,7 @@ class bLda2vec:
             tf.summary.scalar('lda_loss', lda_loss)
             tf.summary.scalar('bias_topic_cov', bias_topic_self_similarity)
 
-            loss_lda = lda_loss + bias_lda_loss + tf.max(0, bias_topic_self_similarity - self.target_bias_topic_cov)
+            loss_lda = lda_loss + bias_lda_loss + tf.maximum(0.0, bias_topic_self_similarity - self.target_bias_topic_cov)
 
 
         # Determine if we should be using only word2vec loss or if we should add in LDA loss based on switch_loss Variable
